@@ -29,7 +29,7 @@ class EbioroPayment extends PaymentModule
     {
         $this->name = 'ebioropayment';
         $this->tab = 'payments_gateways';
-        $this->version = '1.0.0';
+        $this->version = '1.0.1';
         $this->author = 'Ebioro';
         $this->need_instance = 0;
         $this->controllers = array('redirect', 'webhook');
