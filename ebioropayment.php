@@ -110,6 +110,12 @@ class EbioroPayment extends PaymentModule
             $testMode = (bool) Tools::getValue(self::CFG_TEST_MODE);
             $locale = trim((string) Tools::getValue(self::CFG_LOCALE)) ?: 'en';
 
+            // The secret field renders empty (password inputs never echo their
+            // value). A blank submission means "keep the stored secret", not "clear it".
+            if ('' === $apiSecret) {
+                $apiSecret = (string) Configuration::get(self::CFG_API_SECRET);
+            }
+
             if ('' === $apiKey || '' === $apiSecret) {
                 $output .= $this->displayError($this->l('API key and secret are required.'));
             } else {
@@ -144,8 +150,8 @@ class EbioroPayment extends PaymentModule
                         'type' => 'password',
                         'label' => $this->l('API Secret'),
                         'name' => self::CFG_API_SECRET,
-                        'desc' => $this->l('Your Ebioro secret API key (sk_...). Stored server-side only.'),
-                        'required' => true,
+                        'desc' => $this->l('Your Ebioro secret API key (sk_...). Stored server-side only. Leave blank to keep the current secret.'),
+                        'required' => false,
                     ),
                     array(
                         'type' => 'switch',
