@@ -88,8 +88,9 @@ class EbioroApiHandler
 
         // Auth headers are signed over path+timestamp+method+body; extra headers
         // (e.g. Idempotency-Key) are not part of the signature, so they are safe
-        // to append.
-        $headers = array_merge($this->buildAuthHeaders($path, $method, $body), $extraHeaders);
+        // to add. Auth headers are listed last so an extra header can never
+        // clobber X-Digest-* or Content-Type.
+        $headers = array_merge($extraHeaders, $this->buildAuthHeaders($path, $method, $body));
         $url = $this->baseUrl() . $path;
 
         if ('GET' === $method && !empty($params)) {
