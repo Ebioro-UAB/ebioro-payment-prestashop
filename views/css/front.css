@@ -1,0 +1,8 @@
+/* Keep the Ebioro payment-option logo inline and aligned with the label text,
+ * matching the other (text-only) payment rows. */
+.payment-options .payment-option label img {
+    height: 22px;
+    width: auto;
+    vertical-align: middle;
+    margin-left: .4rem;
+}

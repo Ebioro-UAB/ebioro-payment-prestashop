@@ -54,6 +54,7 @@ class EbioroPayment extends PaymentModule
         return parent::install()
             && $this->registerHook('paymentOptions')
             && $this->registerHook('paymentReturn')
+            && $this->registerHook('actionFrontControllerSetMedia')
             && $this->installAwaitingOrderState();
     }
 
@@ -196,11 +197,23 @@ class EbioroPayment extends PaymentModule
 
         $option = new PaymentOption();
         $option->setModuleName($this->name)
-            ->setCallToActionText($this->l('Pay with Ebioro (USDC)'))
+            ->setCallToActionText($this->l('Pay with crypto'))
             ->setAction($this->context->link->getModuleLink($this->name, 'redirect', array(), true))
             ->setLogo(Media::getMediaPath(dirname(__FILE__) . '/logo.png'));
 
         return array($option);
+    }
+
+    /** Load the module's front stylesheet on the checkout. */
+    public function hookActionFrontControllerSetMedia($params)
+    {
+        if (in_array($this->context->controller->php_self, array('order', 'checkout'), true)) {
+            $this->context->controller->registerStylesheet(
+                'ebioropayment-front',
+                'modules/' . $this->name . '/views/css/front.css',
+                array('priority' => 200)
+            );
+        }
     }
 
     /** Confirmation message shown on the order-confirmation page. */

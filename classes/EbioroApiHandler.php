@@ -79,14 +79,17 @@ class EbioroApiHandler
      *
      * @return array{0:bool,1:mixed} [success, decoded body | error message]
      */
-    private function sendRequest($path, array $params = array(), $method = 'GET')
+    private function sendRequest($path, array $params = array(), $method = 'GET', array $extraHeaders = array())
     {
         $method = strtoupper($method);
         $body = in_array($method, array('POST', 'PUT'), true)
             ? json_encode($params, self::JSON_FLAGS)
             : '';
 
-        $headers = $this->buildAuthHeaders($path, $method, $body);
+        // Auth headers are signed over path+timestamp+method+body; extra headers
+        // (e.g. Idempotency-Key) are not part of the signature, so they are safe
+        // to append.
+        $headers = array_merge($this->buildAuthHeaders($path, $method, $body), $extraHeaders);
         $url = $this->baseUrl() . $path;
 
         if ('GET' === $method && !empty($params)) {
@@ -141,12 +144,14 @@ class EbioroApiHandler
     /**
      * Create a hosted-checkout payment.
      *
-     * @param int    $amountMinor amount already in the smallest unit (cents)
-     * @param string $currency    ISO 4217 code
-     * @param array  $metadata    arbitrary data echoed back on the webhook (carries order_id)
+     * @param int    $amountMinor    amount already in the smallest unit (cents)
+     * @param string $currency       ISO 4217 code
+     * @param array  $metadata       arbitrary data echoed back on the webhook (carries order_id)
+     * @param string $idempotencyKey optional — dedupes retries/double-submits so an
+     *                               order never spawns more than one Ebioro payment
      * @return array{0:bool,1:mixed}
      */
-    public function createPayment($amountMinor, $currency, array $metadata, $redirectUrl, $cancelUrl, $webhookUrl, $name, $description, $locale = 'en')
+    public function createPayment($amountMinor, $currency, array $metadata, $redirectUrl, $cancelUrl, $webhookUrl, $name, $description, $locale = 'en', $idempotencyKey = null)
     {
         $args = array(
             'name' => $name,
@@ -162,7 +167,12 @@ class EbioroApiHandler
             'locale' => $locale,
         );
 
-        return $this->sendRequest('/payments', $args, 'POST');
+        $extraHeaders = array();
+        if (!empty($idempotencyKey)) {
+            $extraHeaders[] = 'Idempotency-Key: ' . $idempotencyKey;
+        }
+
+        return $this->sendRequest('/payments', $args, 'POST', $extraHeaders);
     }
 
     /**

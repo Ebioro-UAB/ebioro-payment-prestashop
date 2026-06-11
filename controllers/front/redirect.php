@@ -85,7 +85,10 @@ class EbioroPaymentRedirectModuleFrontController extends ModuleFrontController
             $webhookUrl,
             Configuration::get('PS_SHOP_NAME'),
             $this->module->l('Order') . ' #' . $orderId,
-            Configuration::get(EbioroPayment::CFG_LOCALE) ?: 'en'
+            Configuration::get(EbioroPayment::CFG_LOCALE) ?: 'en',
+            // At most one Ebioro payment per order — a retry/double-submit replays
+            // the original instead of creating a duplicate payment.
+            'ps-' . (int) $this->module->id . '-order-' . $orderId
         );
 
         if (!$ok || empty($result['hostedUrl'])) {
