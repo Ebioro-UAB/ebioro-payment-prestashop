@@ -1,0 +1,4 @@
+/docker/*_data/
+.DS_Store
+*.log
+vendor/

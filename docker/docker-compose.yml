@@ -1,0 +1,59 @@
+name: ebioro-prestashop-dev
+
+# Local PrestaShop 8 + MySQL for developing and testing the Ebioro payment
+# module. The module folder is mounted live into the shop, so edits on your
+# machine appear inside PrestaShop immediately (just reset the module from the
+# Back Office to pick up install()/hook changes).
+#
+#   docker compose -f docker/docker-compose.yml up -d
+#   → shop:        http://localhost:8080
+#   → back office: http://localhost:8080/admin-dev  (admin@ebioro.test / ebioro1234)
+#
+# The webhook needs a public HTTPS URL to reach this machine. Use a tunnel
+# (e.g. `cloudflared tunnel --url http://localhost:8080` or ngrok) and set the
+# shop domain to that host, or test the webhook with the curl recipe in README.
+
+services:
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: prestashop
+      MYSQL_DATABASE: prestashop
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-pprestashop"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  prestashop:
+    image: prestashop/prestashop:8.1
+    depends_on:
+      mysql:
+        condition: service_healthy
+    ports:
+      - "8080:80"
+    environment:
+      DB_SERVER: mysql
+      DB_NAME: prestashop
+      DB_USER: root
+      DB_PASSWD: prestashop
+      PS_DOMAIN: localhost:8080
+      PS_INSTALL_AUTO: 1
+      PS_ERASE_DB: 0
+      PS_DEV_MODE: 1
+      PS_FOLDER_ADMIN: admin-dev
+      PS_FOLDER_INSTALL: install-dev
+      ADMIN_MAIL: admin@ebioro.test
+      ADMIN_PASSWD: ebioro1234
+      PS_LANGUAGE: en
+      PS_COUNTRY: nl
+    volumes:
+      # Mount the module source live into the shop.
+      - ../:/var/www/html/modules/ebioropayment
+      - ps_data:/var/www/html
+
+volumes:
+  db_data:
+  ps_data:
