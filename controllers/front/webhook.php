@@ -49,8 +49,51 @@ class EbioroPaymentWebhookModuleFrontController extends ModuleFrontController
             $this->respond(404, 'Order not found');
         }
 
+        // Defence in depth: only act on orders actually paying via Ebioro.
+        if ($order->module !== $this->module->name) {
+            $this->respond(200, 'Ignored: not an Ebioro order');
+        }
+
+        // Bind the event to the payment this order was started with (stored on the order
+        // as a private message in redirect.php, so it lives and dies with the order — no
+        // global-config accumulation). A superseded payment (a retry created a newer one)
+        // or a spoofed id for another order must not drive this order's state.
+        $boundPid = $this->getBoundPaymentId((int) $order->id);
+        if ($boundPid) {
+            if (empty($event['id'])) {
+                // Order is bound to a payment but the event carries no id — reject rather
+                // than fail open.
+                $this->respond(400, 'Missing payment id');
+            }
+            if (!hash_equals($boundPid, (string) $event['id'])) {
+                // Stale/superseded/wrong payment. 200 so Ebioro does not record a failed
+                // delivery for a legitimately superseded payment.
+                $this->respond(200, 'Ignored: stale payment');
+            }
+        }
+
         $this->updateOrderState($order, $event);
         $this->respond(200, 'OK');
+    }
+
+    /**
+     * The Ebioro payment id an order was started with, read from the private order
+     * message written in redirect.php ("Ebioro payment reference: <id>"). Returns '' when
+     * absent (e.g. legacy orders) so the binding check is skipped rather than failing.
+     */
+    private function getBoundPaymentId($orderId)
+    {
+        $prefix = 'Ebioro payment reference: ';
+        $row = Db::getInstance()->getValue(
+            'SELECT `message` FROM `' . _DB_PREFIX_ . 'message`'
+            . ' WHERE `id_order` = ' . (int) $orderId
+            . ' AND `message` LIKE \'' . pSQL($prefix) . '%\''
+            . ' ORDER BY `id_message` DESC'
+        );
+        if (!$row) {
+            return '';
+        }
+        return trim(Tools::substr($row, Tools::strlen($prefix)));
     }
 
     /** Map the Ebioro event to a PrestaShop order state. */
