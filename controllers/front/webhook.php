@@ -49,7 +49,34 @@ class EbioroPaymentWebhookModuleFrontController extends ModuleFrontController
             $this->respond(404, 'Order not found');
         }
 
+        // Defence in depth: only act on orders actually paying via Ebioro.
+        if ($order->module !== $this->module->name) {
+            $this->respond(200, 'Ignored: not an Ebioro order');
+        }
+
+        // Bind the event to the payment this order was started with. A superseded payment
+        // (a retry created a newer one) or a spoofed id for another order must not drive
+        // this order's state. Answer 200 so Ebioro does not log a failed delivery for a
+        // legitimately stale event.
+        $boundPid = Configuration::get(EbioroPayment::CFG_ORDER_PID_PREFIX . (int) $order->id);
+        if ($boundPid && !empty($event['id']) && !hash_equals((string) $boundPid, (string) $event['id'])) {
+            $this->respond(200, 'Ignored: stale payment');
+        }
+
         $this->updateOrderState($order, $event);
+
+        // Once the order is settled or dead, drop the per-order binding key so it doesn't
+        // accumulate in ps_configuration.
+        $terminal = array(
+            (int) Configuration::get('PS_OS_PAYMENT'),
+            (int) Configuration::get('PS_OS_CANCELED'),
+            (int) Configuration::get('PS_OS_ERROR'),
+            (int) Configuration::get('PS_OS_REFUND'),
+        );
+        if (in_array((int) $order->getCurrentState(), $terminal, true)) {
+            Configuration::deleteByName(EbioroPayment::CFG_ORDER_PID_PREFIX . (int) $order->id);
+        }
+
         $this->respond(200, 'OK');
     }
 

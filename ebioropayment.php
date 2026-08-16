@@ -25,6 +25,11 @@ class EbioroPayment extends PaymentModule
     /** Custom order state created on install. */
     const CFG_OS_AWAITING = 'EBIORO_OS_AWAITING';
 
+    // Per-order binding: `EBIORO_PID_<id_order>` stores the Ebioro payment id an order
+    // was started with, so the webhook can reject an event carrying a different payment
+    // id for that order (defence in depth). Cleared when the order reaches a terminal state.
+    const CFG_ORDER_PID_PREFIX = 'EBIORO_PID_';
+
     public function __construct()
     {
         $this->name = 'ebioropayment';
