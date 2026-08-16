@@ -104,12 +104,12 @@ class EbioroPaymentRedirectModuleFrontController extends ModuleFrontController
             $this->redirectToCartWithError(is_string($result) ? $result : 'Could not start the Ebioro payment.');
         }
 
-        // Record the Ebioro payment reference on the order: a back-office note for humans,
-        // and a retrievable binding the webhook checks so a superseded/wrong payment can't
-        // drive this order (see webhook.php).
+        // Record the Ebioro payment reference on the order as a private message — both a
+        // back-office note for humans and the binding the webhook reads to reject a
+        // superseded/wrong payment (see webhook.php::getBoundPaymentId). Stored on the
+        // order, so it's cleaned up with the order — no global-config accumulation.
         if (!empty($result['id'])) {
             $this->addPrivateOrderMessage($order, 'Ebioro payment reference: ' . pSQL($result['id']));
-            Configuration::updateValue(EbioroPayment::CFG_ORDER_PID_PREFIX . (int) $order->id, (string) $result['id']);
         }
 
         // The tokenless short link carries no auth_token, so it can't sit in the
