@@ -91,18 +91,30 @@ class EbioroPaymentRedirectModuleFrontController extends ModuleFrontController
             'ps-' . (int) $this->module->id . '-order-' . $orderId
         );
 
-        if (!$ok || empty($result['hostedUrl'])) {
+        // Prefer the tokenless short link; fall back to hostedUrl only if short links
+        // are not enabled for the environment. A success with no usable redirect URL is
+        // a failure — never redirect the customer to nothing.
+        $checkoutUrl = '';
+        if ($ok && is_array($result)) {
+            $checkoutUrl = !empty($result['shortUrl']) ? $result['shortUrl'] : (!empty($result['hostedUrl']) ? $result['hostedUrl'] : '');
+        }
+        if (!$ok || '' === $checkoutUrl) {
             // Mark the order failed so it isn't left dangling in "awaiting".
             $order->setCurrentState((int) Configuration::get('PS_OS_ERROR'));
             $this->redirectToCartWithError(is_string($result) ? $result : 'Could not start the Ebioro payment.');
         }
 
-        // Record the Ebioro payment reference on the order for reconciliation.
+        // Record the Ebioro payment reference on the order as a private message — both a
+        // back-office note for humans and the binding the webhook reads to reject a
+        // superseded/wrong payment (see webhook.php::getBoundPaymentId). Stored on the
+        // order, so it's cleaned up with the order — no global-config accumulation.
         if (!empty($result['id'])) {
-            $this->addPrivateOrderMessage($order, 'Ebioro payment reference: ' . pSQL($result['id']));
+            $this->addPrivateOrderMessage($order, 'Ebioro payment reference: ' . $result['id']);
         }
 
-        Tools::redirect($result['hostedUrl']);
+        // The tokenless short link carries no auth_token, so it can't sit in the
+        // customer's browser history/referrer as a bearer credential.
+        Tools::redirect($checkoutUrl);
     }
 
     private function redirectToCartWithError($message)
