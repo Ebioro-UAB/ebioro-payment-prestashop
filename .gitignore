@@ -2,3 +2,7 @@
 .DS_Store
 *.log
 vendor/
+
+# Claude Code / MCP local state — never commit
+.claude/
+.mcp.json
